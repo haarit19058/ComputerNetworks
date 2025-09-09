@@ -43,4 +43,6 @@ for idx, pkt in enumerate(dns_packets):
 
     # Send to server
     sock.sendto(message, (SERVER_HOST, SERVER_PORT))
-    print(f"Sent DNS query {idx:02} with header {header.decode()}")
+    data, _ = sock.recvfrom(1024)
+    print(f"DNS Response: {data.decode()}")
+    # print(f"Sent DNS query {idx:02} with header {header.decode()}")
