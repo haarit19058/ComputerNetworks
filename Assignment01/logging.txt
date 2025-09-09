@@ -1,0 +1,79 @@
+Server running on 127.0.0.1:5553
+Received header: 13444100 from ('127.0.0.1', 48878)
+DNS query: _apple-mobdev._tcp.local.
+Resolved: Error: The resolution lifetime expired after 5.402 seconds: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.
+
+Received header: 13444101 from ('127.0.0.1', 48878)
+DNS query: _apple-mobdev._tcp.local.
+Resolved: Error: All nameservers failed to answer the query _apple-mobdev._tcp.local. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444102 from ('127.0.0.1', 48878)
+DNS query: N/A
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444103 from ('127.0.0.1', 48878)
+DNS query: N/A
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444104 from ('127.0.0.1', 48878)
+DNS query: N/A
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444105 from ('127.0.0.1', 48878)
+DNS query: N/A
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444106 from ('127.0.0.1', 48878)
+DNS query: N/Am 
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444107 from ('127.0.0.1', 48878)
+DNS query: N/A
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444108 from ('127.0.0.1', 48878)
+DNS query: N/A
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444109 from ('127.0.0.1', 48878)
+DNS query: N/A
+Resolved: Error: All nameservers failed to answer the query N/A. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444110 from ('127.0.0.1', 48878)
+DNS query: wikipedia.org.
+Resolved: 103.102.166.224
+
+Received header: 13444111 from ('127.0.0.1', 48878)
+DNS query: Brother MFC-7860DW._pdl-datastream._tcp.local.
+Resolved: Error: The resolution lifetime expired after 5.403 seconds: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.
+
+Received header: 13444112 from ('127.0.0.1', 48878)
+DNS query: Brother MFC-7860DW._pdl-datastream._tcp.local.
+Resolved: Error: All nameservers failed to answer the query Brother\032MFC-7860DW._pdl-datastream._tcp.local. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444113 from ('127.0.0.1', 48878)
+DNS query: reddit.com.
+Resolved: 151.101.193.140, 151.101.129.140, 151.101.65.140, 151.101.1.140
+
+Received header: 13444114 from ('127.0.0.1', 48878)
+DNS query: Brother MFC-7860DW._pdl-datastream._tcp.local.
+Resolved: Error: The resolution lifetime expired after 5.403 seconds: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.
+
+Received header: 13444115 from ('127.0.0.1', 48878)
+DNS query: Brother MFC-7860DW._pdl-datastream._tcp.local.
+Resolved: Error: All nameservers failed to answer the query Brother\032MFC-7860DW._pdl-datastream._tcp.local. IN A: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered REFUSED
+
+Received header: 13444116 from ('127.0.0.1', 48878)
+DNS query: apple.com.
+Resolved: 17.253.144.10
+
+Received header: 13444117 from ('127.0.0.1', 48878)
+DNS query: twitter.com.
+Resolved: 172.66.0.227
+
+Received header: 13444118 from ('127.0.0.1', 48878)
+DNS query: _apple-mobdev._tcp.local.
+Resolved: Error: The resolution lifetime expired after 5.404 seconds: Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.; Server Do53:127.0.0.53@53 answered The DNS operation timed out.
+
+Received header: 13444119 from ('127.0.0.1', 48878)
+DNS query: N/A
