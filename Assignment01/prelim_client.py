@@ -27,7 +27,7 @@ SERVER_PORT = 5553
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Read PCAP and filter DNS queries
-packets = rdpcap("7.pcap")
+packets = rdpcap("7.pcap") ###
 dns_packets = [pkt for pkt in packets if pkt.haslayer(DNS)]
 
 for idx, pkt in enumerate(dns_packets):
@@ -36,6 +36,7 @@ for idx, pkt in enumerate(dns_packets):
     # Create custom header HHMMSS + ID (2 digits)
     now = datetime.now()
     header = f"{now.hour:02}{now.minute:02}{now.second:02}{idx:02}".encode()  # 8 bytes
+    print(header)
 
     # Prepend custom header
     message = header + dns_payload
