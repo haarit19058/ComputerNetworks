@@ -1,34 +1,18 @@
-# import socket
-
-# # Server configuration
-# SERVER_HOST = '127.0.0.1'
-# SERVER_PORT = 1235
-
-# sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-# while True:
-#     domain = input("Enter domain name: ").strip()
-#     if not domain:
-#         break
-
-#     sock.sendto(domain.encode(), (SERVER_HOST, SERVER_PORT))
-#     data, _ = sock.recvfrom(1024)
-#     print(f"DNS Response: {data.decode()}")
-
 import socket
 import dpkt
 from datetime import datetime
+from time import sleep
 
 SERVER_HOST = '127.0.0.1'
 SERVER_PORT = 5553
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Open PCAP file
+dns_packets = []
+
 with open("7.pcap", "rb") as f:
     pcap = dpkt.pcap.Reader(f)
 
-    dns_packets = []
     for ts, buf in pcap:
         try:
             eth = dpkt.ethernet.Ethernet(buf)
@@ -62,6 +46,7 @@ for idx, dns in enumerate(dns_packets):
 
     # Receive response
     data, _ = sock.recvfrom(1024)
-    # Print query name(s) for debugging
-    query_names = [q.name.decode() for q in dns.qd] if dns.qd else []
-    print(f"Response for packet {idx}: Query={query_names} -> {data.decode()}")
+    domain_name,domain_ip = data.decode().split("|")
+
+    print(f"Response for packet {idx}: Domain={domain_name} -> IP:{domain_ip}")
+    sleep(1)  
