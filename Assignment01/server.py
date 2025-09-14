@@ -32,6 +32,7 @@ def get_ip(header):
     # First 2 bytes = Hour, next 2 bytes = Minute
     hh = int(header[0:2])
     mm = int(header[2:4])
+    
     # Last 2 bytes of header = packet ID (for hashing)
     pkt_id = int(header[6:8])
 
