@@ -63,9 +63,20 @@ for idx, dns in enumerate(dns_packets):
     message = header + dns_payload
     sock.sendto(message, (SERVER_HOST, SERVER_PORT))
 
-    # Receive response
+    # Receive DNS response from server
     data, _ = sock.recvfrom(1024)
-    domain_name,domain_ip = data.decode().split("|")
+
+    # Parse response DNS
+    dns_resp = dpkt.dns.DNS(data)
+
+    if dns_resp.an:  # check if there is at least one answer
+        answer = dns_resp.an[0]
+        domain_name = answer.name.decode() if isinstance(answer.name, bytes) else answer.name
+        domain_ip = socket.inet_ntoa(answer.rdata) if answer.type == dpkt.dns.DNS_A else "N/A"
+    else:
+        domain_name = dns_resp.qd[0].name.decode() if dns_resp.qd else "unknown"
+        domain_ip = "no answer"
 
     print(f"Response for packet {idx}: Domain={domain_name} -> IP:{domain_ip}")
+
     sleep(2)  # Pause between packets

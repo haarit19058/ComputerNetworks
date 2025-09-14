@@ -79,23 +79,48 @@ print(f"Server running on {HOST}:{PORT}")
 df = pd.DataFrame(columns=["Timestamp", "Client_IP", "Client_Port", "Domain", "Selected_IP"])
 
 
-# Main Server Loop
 while True:
-    # Wait for client data (blocking call)
+    # Wait for client data
     data, addr = sock.recvfrom(4096)
     client_ip, client_port = addr
     print(f"Received {len(data)} bytes from {client_ip}:{client_port}")
 
     # Step 1: Parse custom header (8 bytes)
     header = data[:8].decode(errors="ignore")
-    selected_ip = get_ip(header)
+    selected_ip = get_ip(header)  # custom function -> returns string like "1.2.3.4"
 
     # Step 2: Parse DNS payload
-    dns_payload = data[8:]            # Everything after header is DNS data
-    dns = dpkt.dns.DNS(dns_payload)   # Parse DNS packet
-    domain_name = dns.qd[0].name if dns.qd else "unknown"
+    dns_payload = data[8:]             # Everything after header is DNS data
+    dns_req = dpkt.dns.DNS(dns_payload)
 
-    # Step 3: Log query in DataFrame
+    domain_name = dns_req.qd[0].name if dns_req.qd else "unknown"
+
+    # Step 2b: Build DNS response
+    dns_resp = dpkt.dns.DNS(
+        id=dns_req.id,
+        qr=dpkt.dns.DNS_R,             
+        opcode=dns_req.opcode,
+        rcode=dpkt.dns.DNS_RCODE_NOERR,
+        qd=dns_req.qd,                 
+        an=[]
+    )
+    # print(domain_name)
+
+    # Add an A-record answer
+    if domain_name != "unknown":
+        dns_resp.an.append(
+            dpkt.dns.DNS.RR(
+                name=domain_name,  
+                type=dpkt.dns.DNS_A,
+                cls=dpkt.dns.DNS_IN,
+                ttl=60,
+                rdata=socket.inet_aton(selected_ip)
+            )
+        )
+
+    return_payload = bytes(dns_resp)
+
+    # Log query
     timestamp = header
     df = pd.concat([
         df,
@@ -103,15 +128,13 @@ while True:
                      columns=df.columns)
     ], ignore_index=True)
 
-    # Step 4: Send response back to client
+    # Send response back
     try:
-        # Format: domain|selected_ip
-        sock.sendto(f"{domain_name}|{selected_ip}".encode(), addr)
+        sock.sendto(return_payload, addr)
     except Exception as e:
         sock.sendto(f"Error: {e}".encode(), addr)
 
-    # Debugging info for server logs
     print(f"Header={header} → Domain={domain_name} → Selected IP={selected_ip}")
 
-    # Step 5: Persist log to CSV
+    # Persist log
     df.to_csv("dns_log.csv", index=False)
