@@ -1,10 +1,22 @@
-# How to run code
+## How to Run the Code
 
-Step 1 : pip install dpkt
+1. Install dependencies:
 
-Step 2 : python server.py
+   ```bash
+   pip install dpkt
+   ```
 
-Step 3 : python client.py
+2. Start the server:
 
+   ```bash
+   python server.py
+   ```
 
-DNS query results are in dns_log.csv
+3. Run the client:
+
+   ```bash
+   python client.py
+   ```
+
+* DNS query results will be stored in **`dns_log.csv`**.
+* The detailed report for this assignment is available in **`A1_report.pdf`**.
