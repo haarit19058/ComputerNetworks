@@ -5,6 +5,8 @@ yay -S mininet
 
 start the openswitch
 
+### Also we need to isntall the ovs switch
+
 sudo systemctl start ovsdb-server.service
 sudo systemctl start ovs-vswitchd.service
 
@@ -35,6 +37,12 @@ Open vSwitch (OVS) is a software-based virtual switch that runs inside Linux.
 sudo mn -c
 
 
+# Installing the controller in mint
+sudo apt-get install openvswitch-testcontroller
+sudo ln -s /usr/bin/ovs-testcontroller /usr/bin/controller
+
+
 
 # How to give internet access to hosts
 
+Mininet have a default nat network configuration in nat.py use it from python only it is the easiets metho

@@ -47,6 +47,7 @@ with open("7.pcap", "rb") as f:
             if udp.sport == 53 or udp.dport == 53:
                 dns = dpkt.dns.DNS(udp.data)
                 if dns.qr == dpkt.dns.DNS_Q:  
+                    
                     dns_packets.append(dns)
         except Exception:
             continue
