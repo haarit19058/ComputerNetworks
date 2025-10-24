@@ -110,15 +110,24 @@ def run():
     info('*** External Internet connectivity test\n')
     print( net.get('h2').cmd('ping -c4 8.8.8.8') )
 
-    info('*** Measuring metrics ***\n\n')
-    rs_h1 = measure_native(net,'h1','PCAP_1_H1.pcap')
-    pprint.pprint(rs_h1)
-    rs_h2 = measure_native(net,'h2','PCAP_2_H2.pcap')
-    pprint.pprint(rs_h2)
-    rs_h3 = measure_native(net,'h3','PCAP_3_H3.pcap')
-    pprint.pprint(rs_h3)
-    rs_h4 = measure_native(net,'h4','PCAP_4_H4.pcap')
-    pprint.pprint(rs_h4)
+    # info('*** Measuring metrics Q2 ***\n\n')
+    # rs_h1 = measure_native(net,'h1','PCAP_1_H1.pcap')
+    # pprint.pprint(rs_h1)
+    # rs_h2 = measure_native(net,'h2','PCAP_2_H2.pcap')
+    # pprint.pprint(rs_h2)
+    # rs_h3 = measure_native(net,'h3','PCAP_3_H3.pcap')
+    # pprint.pprint(rs_h3)
+    # rs_h4 = measure_native(net,'h4','PCAP_4_H4.pcap')
+    # pprint.pprint(rs_h4)
+
+    info("***measuring metrics q4***\n")
+    dns = net.get('dns')
+    dns.cmd('sudo python3 server.py')
+
+    for h in hosts:
+        num = h[1]
+        h.cmd(f'sudo python3 client.py --pcap PCAP_{num}_H{num}.pcap --hostname H{num}')
+
 
     CLI(net)
     net.stop()

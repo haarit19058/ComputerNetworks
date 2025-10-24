@@ -64,7 +64,7 @@ def get_ip(header):
 
 
 # UDP Server Setup
-HOST = '10.0.2.0'   # Localhost
+HOST = '10.0.0.5'   # Localhost
 PORT = 5553          # Listening port (same as client uses)
 
 # Create a UDP socket
