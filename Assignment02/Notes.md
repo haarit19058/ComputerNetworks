@@ -45,4 +45,9 @@ sudo ln -s /usr/bin/ovs-testcontroller /usr/bin/controller
 
 # How to give internet access to hosts
 
-Mininet have a default nat network configuration in nat.py use it from python only it is the easiets metho
+Mininet have a default nat network configuration in nat.py use it from python only it is the easiest method
+
+# No file called /etc/network/interfaces on arch
+make dummy file with following content:
+auto lo
+iface lo inet loopback
