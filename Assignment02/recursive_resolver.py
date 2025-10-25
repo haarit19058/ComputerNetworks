@@ -15,16 +15,17 @@ ROOT_SERVERS = [
 ]
 
 count = 0
-
+total_time = 0
 logs = []
-def log_event(domain, mode, server_ip, step, response_type, rtt, total_time, cache_status):
+
+def log_event(domain, mode, server_ip, step, response_type, rtt, cache_status):
     logs.append({
         "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Domain": domain,
         "Mode": mode,
         "Server_IP": server_ip,
         "Step": step,
-        "Response": response_type,
+        "Response type" : response_type,
         "RTT(s)": round(rtt, 4) if rtt else None,
         "Cache": cache_status
     })
@@ -61,14 +62,17 @@ def lookup(target_name: dns.name.Name,
 
         if ip_from_cache:
             ip_ = ip_from_cache
+            step_type = "Authoritative"
+            log_event(str(target_name), "Recursive", "-", "Cache", "Referral", 0, "HIT")
             logging.debug(f"--------Found target {find_name} in cache--------\n")
 
         else:
             ip_ = ROOT_SERVERS[i]
+            step_type = "Root"
             logging.debug(f"--------Using root server {ip_}--------\n")
 
         try:
-            response, resolved = lookup_recurse(target_name, qtype, ip_, resolved, dns_cache)
+            response, resolved = lookup_recurse(target_name, qtype, ip_, resolved, dns_cache, step_type)
 
             if response.answer:
                 return response
@@ -90,54 +94,49 @@ def lookup_recurse(target_name: dns.name.Name,
                    qtype: dns.rdata.Rdata,
                    ip_,
                    resolved,
-                   dns_cache: dict) -> dns.message.Message:
+                   dns_cache: dict, step_type) -> dns.message.Message:
     """
     This function uses a recursive resolver to find the relevant answer to the
     query,
     """
+    global total_time
     global count
-    count += 1
     outbound_query = dns.message.make_query(target_name, qtype)
             # Determine response type
-    # if ip_ in ROOT_SERVERS:
-    #     step_type = "Root"
-    #     result_type = "Referral"
-    # elif response.answer:
-    #     step_type = "Authoritative"
-    #     
-    # elif response.additional:
-    #     step_type = "Referral"
-    #    
-    # elif response.authority:
-    #     step_type = "Authority"
-    #     result_type = "SOA" if response.authority[0].rdtype == dns.rdatatype.SOA else "NS"
-    # else:
-    #     step_type = "Unknown"
-    #     result_type = "Empty"
+
+    next_step = "Authoritative"
+
+    if step_type == "Root":
+        next_step = "TLD"
+    
     result_type = ""
     try:
-        start_time = time.time()
+        start = time.monotonic()
         response = dns.query.udp(outbound_query, ip_, 3)
-        rtt = (time.time() - start_time) * 1000  # in milliseconds
+        rtt = (time.monotonic() - start) * 1000.0
+        count += 1
+        total_time += rtt
+
         print(f"Query to {ip_} took {rtt} ms")
         if response.answer:
             # logging.debug("\n---------Got Answer-------\n")
             resolved = True             
             result_type = "Response" 
+            log_event(str(target_name), "Recursive", ip_ , step_type, "Response", rtt, "MISS")
             return response, resolved
         elif response.additional:
             result_type = "Referral"
             if response.authority:
                 update_cache(response, dns_cache)
+            log_event(str(target_name), "Recursive", ip_, step_type, result_type, rtt, "MISS")
             response, resolved = lookup_additional(response, target_name,
-                                                   qtype, resolved, dns_cache)
+                                                   qtype, resolved, dns_cache, next_step)
 
         elif response.authority and not resolved:
             result_type = "Referral"
+            log_event(str(target_name), "Recursive", ip_, step_type, result_type, rtt, "MISS")
             response, resolved = lookup_authority(response, target_name,
-                                                  qtype, resolved, dns_cache)
-        log_event(str(target_name), "Recursive", ip_, "Lookup Recurse",
-                    result_type, rtt, time.time() - start_time, "MISS")
+                                                  qtype, resolved, dns_cache, next_step)
         return response, resolved
 
     except Timeout:
@@ -151,7 +150,7 @@ def lookup_additional(response,
                       target_name: dns.name.Name,
                       qtype: dns.rdata.Rdata,
                       resolved,
-                      dns_cache: dict):
+                      dns_cache: dict, step_type) -> dns.message.Message:
     """
     Recursively lookup additional
     """
@@ -160,7 +159,7 @@ def lookup_additional(response,
         for rr_ in rrset:
             if rr_.rdtype == dns.rdatatype.A:
                 response, resolved = lookup_recurse(target_name, qtype,
-                                                    str(rr_), resolved, dns_cache)
+                                                    str(rr_), resolved, dns_cache, step_type)
             if resolved:
                 break
         if resolved:
@@ -171,7 +170,7 @@ def lookup_authority(response,
                      target_name: dns.name.Name,
                      qtype: dns.rdata.Rdata,
                      resolved,
-                     dns_cache: dict):
+                     dns_cache: dict,step_type):
     """3
     Recursively lookup authority
     """                  
@@ -190,7 +189,7 @@ def lookup_authority(response,
                     dns_cache[str(rr_)] = ns_ip
 
                 response, resolved = lookup_recurse(target_name, qtype,
-                                                    ns_ip, resolved, dns_cache)
+                                                    ns_ip, resolved, dns_cache,step_type)
             elif rr_.rdtype == dns.rdatatype.SOA:
                 resolved = True
                 break
@@ -199,18 +198,25 @@ def lookup_authority(response,
 
     return response, resolved
 
+def print_logs():
+    print("\n\n=== DNS Resolution Log ===")
+    for entry in logs:
+        print(" | ".join(f"{k}: {v}" for k, v in entry.items()))
 
 def main():
-    domain_names = ["google.com","google.com","amazon.com","wikipedia.org","nonexistentdomain.xyz"]
+    global total_time
+    global logs
+    domain_names = ["amazon.com","google.com","google.com","wikipedia.org","nonexistentdomain.xyz"]
     dns_cache = {}
     dns_cache['response_cache'] = {}
     for domain_name in domain_names:
         cache_result = dns_cache.get('response_cache').get(domain_name)
         if cache_result:
-            logging.debug("Got response in cache")
+            log_event(str(target_name), "Recursive", "-", "Cache", "Response", 0, "HIT")
             for ans in cache_result.answer:
                 print(ans)
         else:
+            # making target name and qtype objects
             target_name = dns.name.from_text(domain_name)
             qtype = dns.rdatatype.A
             print(target_name, qtype)
@@ -218,8 +224,12 @@ def main():
             print(f"Final answer for {domain_name}:")
             for ans in response.answer:
                 print(ans)
-            
             dns_cache['response_cache'][domain_name] = response
+        print_logs()
+        print("Total resolution time:", total_time, "ms\n\n")
+        total_time = 0
+        logs = []
+    print("Total queries made:", count)
 
 if __name__ == "__main__":
     main()
@@ -333,11 +343,6 @@ if __name__ == "__main__":
 #         else:
 #             return None
 
-
-# def print_logs():
-#     print("\n\n=== DNS Resolution Log ===")
-#     for entry in logs:
-#         print(" | ".join(f"{k}: {v}" for k, v in entry.items()))
 
 
 # if __name__ == "__main__":
