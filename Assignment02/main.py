@@ -8,6 +8,7 @@ from mininet.node import Controller
 import dpkt
 import pprint
 import time
+import re
 
 class CustomTopo( Topo ):
     def build( self ):
@@ -77,32 +78,7 @@ def measure_native(net, hostname, filename):
             # Ignore any malformed packets or parsing errors
             except Exception:
                 continue
-    print(domains)
 
-    # latencies = []
-    # outputs = []
-    # success = 0
-    # tries = len(domains)
-
-    # for domain in domains:
-    #     start = time.time()
-    #     out = host.cmd(f'dig +time=2 +tries=1 {domain}')
-    #     print(out)
-    #     end = time.time()
-    #     latency = end - start
-    #     latencies.append(latency)
-    #     out_stripped = out.strip()
-    #     outputs.append(out_stripped)
-    #     if out_stripped:
-    #         success += 1
-    #     time.sleep(0.1)
-
-    # avg_latency = sum(latencies) / len(latencies) if latencies else None
-    # total_bytes = sum(len(o) for o in outputs)
-    # avg_throughput = total_bytes / sum(latencies) if latencies else None
-    # num_fail = tries - success
-    import re
-    import time
 
     latencies = []
     throughputs = []
@@ -167,8 +143,8 @@ def run():
     info('*** Internal connectivity test\n')
     net.pingAll()
 
-    # info('*** External Internet connectivity test\n')
-    # print( net.get('h2').cmd('ping -c4 8.8.8.8') )
+    info('*** External Internet connectivity test\n')
+    print( net.get('h2').cmd('ping -c4 8.8.8.8') )
 
     # info('*** Measuring metrics Q2 ***\n\n')
     # rs_h1 = measure_native(net,'h1','PCAP_1_H1.pcap')
@@ -183,6 +159,8 @@ def run():
     info("*** measuring metrics q4 ***\n")
     dns = net.get('dns')
     dns.cmd('python3 server.py &')
+
+    hosts = [ net.get(h) for h in ('h1','h2','h3','h4')]
 
     for h in hosts:
         num = h.name[1]

@@ -3,64 +3,20 @@ import json
 from datetime import datetime
 import dpkt
 import pandas as pd
+import dns.message
+import dns.query
+import dns.flags
+import time
+import datetime
+import logging
+from dns.exception import DNSException, Timeout
+import pandas as pd
 
-# Load routing rules from JSON
-with open("rules.json") as f:
-    rules = json.load(f)["timestamp_rules"]["time_based_routing"]
-
-# Define IP Pool
-# These are backend IP addresses available for assignment.
-# The rules decide which IPs from this pool are selected.
-ip_pool = [
-    "192.168.1.1", "192.168.1.2", "192.168.1.3", "192.168.1.4", "192.168.1.5",
-    "192.168.1.6", "192.168.1.7", "192.168.1.8", "192.168.1.9", "192.168.1.10",
-    "192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"
-]
 
 # Convert HH:MM → minutes since midnight
 def parse_time(timestr):
     h, m = map(int, timestr.split(":"))
     return h * 60 + m
-
-
-# Select IP based on timestamp header
-def get_ip(header):
-    """
-    Extracts timestamp & packet ID from header, 
-    applies rules, and chooses an IP from pool.
-    """
-    # First 2 bytes = Hour, next 2 bytes = Minute
-    hh = int(header[0:2])
-    mm = int(header[2:4])
-    
-    # Last 2 bytes of header = packet ID (for hashing)
-    pkt_id = int(header[6:8])
-
-    # Current time in minutes since midnight
-    current_minutes = hh * 60 + mm
-
-    # Iterate through all rules in rules.json
-    for name, rule in rules.items():
-        # Each rule has a time range, like "08:00-16:00"
-        start, end = rule["time_range"].split("-")
-        start_min = parse_time(start)
-        end_min = parse_time(end)
-
-        # Handle both normal ranges (e.g., 08:00-16:00)
-        # and overnight ranges (e.g., 22:00-06:00)
-        if start_min <= end_min:
-            in_range = start_min <= current_minutes <= end_min
-        else:  
-            in_range = (current_minutes >= start_min) or (current_minutes <= end_min)
-
-        # If current time falls in the range, select IP
-        if in_range:
-            start_idx = rule["ip_pool_start"]  # Start position in ip_pool
-            # Distribute packet IDs across the pool using modulo
-            return ip_pool[start_idx + (pkt_id % rule["hash_mod"])]
-
-    # Fallback IP if no rules matched
-    return "0.0.0.0"
 
 
 # UDP Server Setup
@@ -71,23 +27,263 @@ PORT = 5553          # Listening port (same as client uses)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((HOST, PORT))
 
-print(f"Server running on {HOST}:{PORT}")
+# print(f"Server running on {HOST}:{PORT}")
 
-# DataFrame for logging queries
-# Columns:
-# Timestamp (header), Client IP/Port, Domain Name, Selected Backend IP
-df = pd.DataFrame(columns=["Timestamp", "Client_IP", "Client_Port", "Domain", "Selected_IP"])
 
+ROOT_SERVERS = [
+    "198.41.0.4",      # a.root-servers.net
+    "199.9.14.201",    # b.root-servers.net
+    "192.33.4.12",     # c.root-servers.net
+]
+
+
+count = 0
+total_time = 0
+logs = []
+client_ip = ""
+total_bytes = 0
+
+filename = "dns_resolution_log_v2.csv"
+
+df = pd.DataFrame(columns=[
+    "Timestamp",'Client IP', "Domain", "Mode", "Server_IP", "Step",
+    "Response type", "RTT(s)", "Cache Status", "Cumulative Time(ms)"
+])
+
+# with open(filename, "w") as f:
+#     f.write("Timestamp,Client_IP,Domain,Mode,Server_IP,Step,Response type,RTT(s),Cache Status,Cumulative Time(ms)\n")
+
+def log_event(domain, mode, server_ip, step, response_type, rtt, cache_status):
+    global df
+    global total_time
+
+    with open(filename, "a") as f:
+        f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{client_ip},{domain},{mode},{server_ip},{step},{response_type},{round(rtt, 4) if rtt else None},{cache_status},{round(total_time, 4)}\n")
+
+    new_row = pd.DataFrame([{
+        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Client IP":client_ip,
+        "Domain": domain,
+        "Mode": mode,
+        "Server_IP": server_ip,
+        "Step": step,
+        "Response type": response_type,
+        "RTT(s)": round(rtt, 4) if rtt else None,
+        "Cache Status": cache_status,
+        "Cumulative Time(ms)": round(total_time, 4)
+    }])
+    df = pd.concat([df, new_row], ignore_index=True)
+
+    df.to_csv("dns_resolution_log.csv", index=False)
+
+def update_cache(response: dns.message.Message, dns_cache):
+    """
+    Update cache with intermediate results
+    """
+    domain_name = response.authority[0].to_text().split(" ")[0]
+
+    arecords = []
+    rrsets = response.additional
+    for rrset in rrsets:
+        for rr_ in rrset:
+            if rr_.rdtype == dns.rdatatype.A:
+                arecords.append(str(rr_))
+                dns_cache[domain_name] = str(rr_)
+    print(f"Updated cache with {domain_name} : {arecords}")
+
+def lookup(target_name: dns.name.Name,
+           qtype: dns.rdata.Rdata,
+           dns_cache: dict) -> dns.message.Message:
+    global total_time
+    global count
+    global total_bytes
+    i = 0
+    resolved = False
+
+    cache_tries = 0
+    while i < len(ROOT_SERVERS):
+        ip_from_cache = ""
+        find_name = str(target_name)
+        next_dot = str(target_name).find('.')
+
+        while not ip_from_cache and next_dot > -1:
+            ip_from_cache = dns_cache.get(find_name)
+            find_name = str(find_name)[next_dot+1:]
+            next_dot = find_name.find('.')
+
+        if ip_from_cache:
+            total_bytes = 0
+            total_time = 0
+            ip_ = ip_from_cache
+            step_type = "Authoritative"
+            log_event(str(target_name), "Recursive", "-", "Cache", "Referral", 0, "HIT")
+            logging.debug(f"--------Found target {find_name} in cache--------\n")
+            cache_tries += 1
+            if cache_tries > 1:
+                dns_cache.pop(find_name, None)
+                ip_ = ROOT_SERVERS[i]
+                step_type = "Root"
+                # continue
+
+        else:
+            ip_ = ROOT_SERVERS[i]
+            step_type = "Root"
+            logging.debug(f"--------Using root server {ip_}--------\n")
+
+        try:
+            response, resolved = lookup_recurse(target_name, qtype, ip_, resolved, dns_cache, step_type)
+
+            if response.answer:
+                return response
+            elif response.authority and response.authority[0].rdtype == dns.rdatatype.SOA:
+                # logging.debug("---------Got SOA authority-------")
+                break
+            else:
+                i += 1
+                # print(i)
+        except Timeout:
+            # logging.debug("Timeout")
+            i += 1
+        except DNSException:
+            # logging.debug("DNSException")
+            i += 1                      
+
+    return response # failure
+
+def lookup_recurse(target_name: dns.name.Name,
+                   qtype: dns.rdata.Rdata,
+                   ip_,
+                   resolved,
+                   dns_cache: dict, step_type) -> dns.message.Message:
+    """
+    This function uses a recursive resolver to find the relevant answer to the
+    query,
+    """
+    global total_time
+    global count
+    global total_bytes
+    outbound_query = dns.message.make_query(target_name, qtype)
+    total_bytes += len(outbound_query.to_wire())
+
+            # Determine response type
+
+    next_step = "Authoritative"
+
+    if step_type == "Root":
+        next_step = "TLD"
+    
+    result_type = ""
+    try:
+        start = time.monotonic()
+        response = dns.query.udp(outbound_query, ip_, 3)
+        rtt = (time.monotonic() - start) * 1000.0
+        count += 1
+        total_time += rtt
+
+        # print(f"Query to {ip_} took {rtt} ms")
+        if response.answer:
+            # logging.debug("\n---------Got Answer-------\n")
+            resolved = True             
+            result_type = "Response" 
+            log_event(str(target_name), "Recursive", ip_ , step_type, "Response", rtt, "MISS")
+            return response, resolved
+        elif response.additional:
+            result_type = "Referral"
+            if response.authority:
+                update_cache(response, dns_cache)
+            log_event(str(target_name), "Recursive", ip_, step_type, result_type, rtt, "MISS")
+            response, resolved = lookup_additional(response, target_name,
+                                                   qtype, resolved, dns_cache, next_step)
+
+        elif response.authority and not resolved:
+            result_type = "Referral"
+            log_event(str(target_name), "Recursive", ip_, step_type, result_type, rtt, "MISS")
+            response, resolved = lookup_authority(response, target_name,
+                                                  qtype, resolved, dns_cache, next_step)
+        return response, resolved
+
+    except Timeout:
+        # logging.debug("Timeout")
+        return dns.message.Message(), False
+    except DNSException:
+        # logging.debug("DNSException")
+        return dns.message.Message(), False
+    
+def lookup_additional(response,
+                      target_name: dns.name.Name,
+                      qtype: dns.rdata.Rdata,
+                      resolved,
+                      dns_cache: dict, step_type) -> dns.message.Message:
+    """
+    Recursively lookup additional
+    """
+    rrsets = response.additional
+    for rrset in rrsets:
+        for rr_ in rrset:
+            if rr_.rdtype == dns.rdatatype.A:
+                response, resolved = lookup_recurse(target_name, qtype,
+                                                    str(rr_), resolved, dns_cache, step_type)
+            if resolved:
+                break
+        if resolved:
+            break
+    return response, resolved
+    
+def lookup_authority(response,
+                     target_name: dns.name.Name,
+                     qtype: dns.rdata.Rdata,
+                     resolved,
+                     dns_cache: dict,step_type):
+    """3
+    Recursively lookup authority
+    """                  
+    rrsets = response.authority
+    ns_ip = ""
+    for rrset in rrsets:
+        for rr_ in rrset:
+            if rr_.rdtype == dns.rdatatype.NS:
+                ns_ip = dns_cache.get(str(rr_))
+                if not ns_ip:
+                    ns_arecords = lookup(str(rr_), dns.rdatatype.A, dns_cache)
+                    if ns_arecords.answer and len(ns_arecords.answer[0]) > 0:
+                        ns_ip = str(ns_arecords.answer[0][0])
+                    else:
+                        continue
+                    dns_cache[str(rr_)] = ns_ip
+
+                response, resolved = lookup_recurse(target_name, qtype,
+                                                    ns_ip, resolved, dns_cache,step_type)
+            elif rr_.rdtype == dns.rdatatype.SOA:
+                resolved = True
+                break
+        if resolved:
+            break
+
+    return response, resolved
+
+# def print_logs():
+    # print("\n\n=== DNS Resolution Log ===")
+    # for entry in logs:
+        # print(" | ".join(f"{k}: {v}" for k, v in entry.items()))
+
+
+
+dns_cache = {}
+dns_cache['response_cache'] = {}
+failure = 0
+success = 0
 
 while True:
+    # global total_time
+    # global logs
     # Wait for client data
     data, addr = sock.recvfrom(4096)
     client_ip, client_port = addr
-    print(f"Received {len(data)} bytes from {client_ip}:{client_port}")
+    # print(f"Received {len(data)} bytes from {client_ip}:{client_port}")
 
     # Step 1: Parse custom header (8 bytes)
     header = data[:8].decode(errors="ignore")
-    selected_ip = get_ip(header)  # custom function -> returns string like "1.2.3.4"
+    # selected_ip = get_ip(header)  # custom function -> returns string like "1.2.3.4"
 
     # Step 2: Parse DNS payload
     dns_payload = data[8:]             # Everything after header is DNS data
@@ -95,46 +291,37 @@ while True:
 
     domain_name = dns_req.qd[0].name if dns_req.qd else "unknown"
 
-    # Step 2b: Build DNS response
-    dns_resp = dpkt.dns.DNS(
-        id=dns_req.id,
-        qr=dpkt.dns.DNS_R,             
-        opcode=dns_req.opcode,
-        rcode=dpkt.dns.DNS_RCODE_NOERR,
-        qd=dns_req.qd,                 
-        an=[]
-    )
-    # print(domain_name)
+    cache_result = dns_cache.get('response_cache').get(domain_name)
 
-    # Add an A-record answer
-    if domain_name != "unknown":
-        dns_resp.an.append(
-            dpkt.dns.DNS.RR(
-                name=domain_name,  
-                type=dpkt.dns.DNS_A,
-                cls=dpkt.dns.DNS_IN,
-                ttl=60,
-                rdata=socket.inet_aton(selected_ip)
-            )
-        )
+    if cache_result:
+        total_bytes = 0
+        total_time = 0
+        log_event(str(target_name), "Recursive", "-", "Cache", "Response", 0, "HIT")
+        for ans in cache_result.answer:
+            print(ans)
+    else:
+        # making target name and qtype objects
+        target_name = dns.name.from_text(domain_name)
+        qtype = dns.rdatatype.A
+        # print(target_name, qtype)
+        response = lookup(target_name, qtype, dns_cache)
+        if not response.answer:
+            log_event(str(target_name), "Recursive", "-", "N/A", "Failure", 0, "MISS")
+            failure += 1
+        
+        
+        success += 1
+        # print(f"Final answer for {domain_name}:")
+        for ans in response.answer:
+            print(ans)
+        dns_cache['response_cache'][domain_name] = response
+    
+    
 
-    return_payload = bytes(dns_resp)
+    # print_logs()
+    # print("Total resolution time:", total_time, "ms\n\n")
+    total_bytes = 0
+    total_time = 0
+    logs = []
+    # print("Total queries made:", count)
 
-    # Log query
-    timestamp = header
-    df = pd.concat([
-        df,
-        pd.DataFrame([[timestamp, client_ip, client_port, domain_name, selected_ip]],
-                     columns=df.columns)
-    ], ignore_index=True)
-
-    # Send response back
-    try:
-        sock.sendto(return_payload, addr)
-    except Exception as e:
-        sock.sendto(f"Error: {e}".encode(), addr)
-
-    print(f"Header={header} → Domain={domain_name} → Selected IP={selected_ip}")
-
-    # Persist log
-    df.to_csv("dns_log.csv", index=False)
