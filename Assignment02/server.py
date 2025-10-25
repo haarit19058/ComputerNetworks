@@ -11,24 +11,25 @@ import datetime
 import logging
 from dns.exception import DNSException, Timeout
 import pandas as pd
+import dns.message
+import dns.rcode
+import dns.rdatatype
+import dns.flags
+import csv
+import datetime
 
 
-# Convert HH:MM → minutes since midnight
-def parse_time(timestr):
-    h, m = map(int, timestr.split(":"))
-    return h * 60 + m
 
+INTER_PACKET_SLEEP = 0.0
 
 # UDP Server Setup
 HOST = '10.0.0.5'   # Localhost
-PORT = 5553          # Listening port (same as client uses)
+PORT = 553          # Listening port (same as client uses)
 
 # Create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((HOST, PORT))
-
-# print(f"Server running on {HOST}:{PORT}")
-
+print(f"Server running on {HOST}:{PORT}")
 
 ROOT_SERVERS = [
     "198.41.0.4",      # a.root-servers.net
@@ -36,6 +37,10 @@ ROOT_SERVERS = [
     "192.33.4.12",     # c.root-servers.net
 ]
 
+dns_cache = {}
+dns_cache['response_cache'] = {}
+failure = 0
+success = 0
 
 count = 0
 total_time = 0
@@ -43,38 +48,45 @@ logs = []
 client_ip = ""
 total_bytes = 0
 
-filename = "dns_resolution_log_v2.csv"
+
+
 
 df = pd.DataFrame(columns=[
     "Timestamp",'Client IP', "Domain", "Mode", "Server_IP", "Step",
     "Response type", "RTT(s)", "Cache Status", "Cumulative Time(ms)"
 ])
 
-# with open(filename, "w") as f:
-#     f.write("Timestamp,Client_IP,Domain,Mode,Server_IP,Step,Response type,RTT(s),Cache Status,Cumulative Time(ms)\n")
+with open('dns_logs1.csv', 'w', newline='') as f:
+    f.write("Timestamp,Client IP,Domain,Mode,Server_IP,Step,Response type,RTT(s),Cache Status,Cumulative Time(ms)\n")
 
 def log_event(domain, mode, server_ip, step, response_type, rtt, cache_status):
     global df
     global total_time
 
-    with open(filename, "a") as f:
+    with open('dns_logs1.csv', 'a', newline='') as f:
         f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{client_ip},{domain},{mode},{server_ip},{step},{response_type},{round(rtt, 4) if rtt else None},{cache_status},{round(total_time, 4)}\n")
 
-    new_row = pd.DataFrame([{
-        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Client IP":client_ip,
-        "Domain": domain,
-        "Mode": mode,
-        "Server_IP": server_ip,
-        "Step": step,
-        "Response type": response_type,
-        "RTT(s)": round(rtt, 4) if rtt else None,
-        "Cache Status": cache_status,
-        "Cumulative Time(ms)": round(total_time, 4)
-    }])
-    df = pd.concat([df, new_row], ignore_index=True)
+    # new_row = pd.DataFrame([{
+    #     "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    #     "Client IP":client_ip,
+    #     "Domain": domain,
+    #     "Mode": mode,
+    #     "Server_IP": server_ip,
+    #     "Step": step,
+    #     "Response type": response_type,
+    #     "RTT(s)": round(rtt, 4) if rtt else None,
+    #     "Cache Status": cache_status,
+    #     "Cumulative Time(ms)": round(total_time, 4)
+    # }])
+    # df = pd.concat([df, new_row], ignore_index=True)
 
-    df.to_csv("dns_resolution_log.csv", index=False)
+    
+
+# Convert HH:MM → minutes since midnight
+def parse_time(timestr):
+    h, m = map(int, timestr.split(":"))
+    return h * 60 + m
+
 
 def update_cache(response: dns.message.Message, dns_cache):
     """
@@ -89,7 +101,7 @@ def update_cache(response: dns.message.Message, dns_cache):
             if rr_.rdtype == dns.rdatatype.A:
                 arecords.append(str(rr_))
                 dns_cache[domain_name] = str(rr_)
-    print(f"Updated cache with {domain_name} : {arecords}")
+    # print(f"Updated cache with {domain_name} : {arecords}")
 
 def lookup(target_name: dns.name.Name,
            qtype: dns.rdata.Rdata,
@@ -268,60 +280,119 @@ def lookup_authority(response,
 
 
 
-dns_cache = {}
-dns_cache['response_cache'] = {}
-failure = 0
-success = 0
 
 while True:
-    # global total_time
-    # global logs
-    # Wait for client data
-    data, addr = sock.recvfrom(4096)
-    client_ip, client_port = addr
-    # print(f"Received {len(data)} bytes from {client_ip}:{client_port}")
+    try:
+        data, addr = sock.recvfrom(4096)   # bytes from client
+        client_ip, client_port = addr
 
-    # Step 1: Parse custom header (8 bytes)
-    header = data[:8].decode(errors="ignore")
-    # selected_ip = get_ip(header)  # custom function -> returns string like "1.2.3.4"
+        # Parse incoming DNS request using dnspython
+        try:
+            dns_req = dns.message.from_wire(data)
+        except Exception as e:
+            # malformed packet — ignore or optionally log
+            print(f"Bad DNS packet from {client_ip}:{client_port} — {e}")
+            continue
 
-    # Step 2: Parse DNS payload
-    dns_payload = data[8:]             # Everything after header is DNS data
-    dns_req = dpkt.dns.DNS(dns_payload)
+        # Ensure there is at least one question
+        if not dns_req.question:
+            # nothing to do, ignore
+            continue
 
-    domain_name = dns_req.qd[0].name if dns_req.qd else "unknown"
+        q = dns_req.question[0]
+        domain_name = q.name.to_text()
+        qtype = q.rdtype 
 
-    cache_result = dns_cache.get('response_cache').get(domain_name)
+        # Check cache (store cached responses as bytes to avoid mutability issues)
+        cache_store = dns_cache.get('response_cache', {})
+        cached_wire = cache_store.get(domain_name)
 
-    if cache_result:
-        total_bytes = 0
-        total_time = 0
-        log_event(str(target_name), "Recursive", "-", "Cache", "Response", 0, "HIT")
-        for ans in cache_result.answer:
-            print(ans)
-    else:
-        # making target name and qtype objects
-        target_name = dns.name.from_text(domain_name)
-        qtype = dns.rdatatype.A
-        # print(target_name, qtype)
-        response = lookup(target_name, qtype, dns_cache)
-        if not response.answer:
-            log_event(str(target_name), "Recursive", "-", "N/A", "Failure", 0, "MISS")
-            failure += 1
-        
-        
-        success += 1
-        # print(f"Final answer for {domain_name}:")
-        for ans in response.answer:
-            print(ans)
-        dns_cache['response_cache'][domain_name] = response
-    
-    
+        if cached_wire:
+            # Cache HIT: recreate message from bytes and patch the request ID
+            try:
+                cached_msg = dns.message.from_wire(cached_wire)
+                # Preserve requester transaction id
+                cached_msg.id = dns_req.id
+                # Ensure flags show response
+                cached_msg.flags |= dns.flags.QR
+                # Send cached response bytes (use to_wire to ensure proper encoding with patched id)
+                out = cached_msg.to_wire()
+                sock.sendto(out, addr)
 
-    # print_logs()
-    # print("Total resolution time:", total_time, "ms\n\n")
-    total_bytes = 0
-    total_time = 0
-    logs = []
-    # print("Total queries made:", count)
+                # Logging similar to your snippet
+                log_event(domain_name, "Recursive", "-", "Cache", "Response", 0, "HIT")
+                total_bytes = len(out)
+                total_time = 0
+                for ans in cached_msg.answer:
+                    print(ans)
 
+                success += 1
+
+            except Exception as e:
+                # If cached bytes corrupted, remove from cache and fall through to lookup
+                print(f"Corrupt cache entry for {domain_name}: {e}")
+                cache_store.pop(domain_name, None)
+
+        else:
+            # Cache MISS: perform lookup (user-provided function)
+            try:
+                # Convert q.name to a dns.name.Name if lookup expects that type
+                # Here we assume lookup accepts dns.name.Name and qtype numeric
+                target_name = q.name
+                response_msg = lookup(target_name, qtype, dns_cache)
+
+                # If lookup returned None, create SERVFAIL
+                if response_msg is None:
+                    # construct a minimal SERVFAIL reply
+                    response_msg = dns.message.Message(id=dns_req.id)
+                    response_msg.set_rcode(dns.rcode.SERVFAIL)
+                    response_msg.flags |= dns.flags.QR
+
+                # Ensure response contains the original transaction id
+                response_msg.id = dns_req.id
+                # Ensure it is marked as a response
+                response_msg.flags |= dns.flags.QR
+
+                # If no answers, you may want to set NXDOMAIN instead (optional)
+                if not response_msg.answer:
+                    # Log failure (same as your original)
+                    log_event(str(target_name), "Recursive", "-", "N/A", "Failure", 0, "MISS")
+                    failure += 1
+                else:
+                    # Log success (you logged success after lookup in original)
+                    pass
+
+                # Send to client
+                out = response_msg.to_wire()
+                sock.sendto(out, addr)
+
+                # Save canonical copy to cache (store the wire bytes, not the object)
+                dns_cache.setdefault('response_cache', {})[domain_name] = out
+
+                # Print / logging
+                for ans in response_msg.answer:
+                    print(ans)
+                success += 1
+
+            except Exception as e:
+                # If lookup crashes, reply SERVFAIL to client and log
+                print(f"Lookup error for {domain_name}: {e}")
+                try:
+                    servfail = dns.message.Message(id=dns_req.id)
+                    servfail.set_rcode(dns.rcode.SERVFAIL)
+                    servfail.flags |= dns.flags.QR
+                    sock.sendto(servfail.to_wire(), addr)
+                except Exception:
+                    pass
+                failure += 1
+
+        # optional housekeeping and pacing
+        time.sleep(INTER_PACKET_SLEEP)
+
+    except KeyboardInterrupt:
+        print("Shutting down server loop.")
+        break
+    except Exception as e:
+        # log and continue serving
+        print(f"Unexpected server error: {e}")
+        continue

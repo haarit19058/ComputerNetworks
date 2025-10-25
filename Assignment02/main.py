@@ -139,6 +139,7 @@ def run():
     info('*** Setting nameserver\n')
     for h in hosts:
         h.cmd("echo 'nameserver 8.8.8.8' > /etc/resolv.conf")
+        # h.cmd("echo 'nameserver 10.0.0.5' > /etc/resolv.conf")
 
     info('*** Internal connectivity test\n')
     net.pingAll()
@@ -163,6 +164,7 @@ def run():
     hosts = [ net.get(h) for h in ('h1','h2','h3','h4')]
 
     for h in hosts:
+        info(f'*** Starting client on {h} ***\n')
         num = h.name[1]
         h.cmd(f'sudo python3 client.py --pcap PCAP_{num}_H{num}.pcap --hostname H{num}')
         time.sleep(10)

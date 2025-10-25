@@ -1,59 +1,69 @@
 #!/usr/bin/env python3
 import socket
+import argparse
 import dpkt
 from datetime import datetime
-from time import sleep, time
-import argparse
-import json
+from time import sleep
+import dns.message
+import dns.query
 
 SERVER_HOST = "10.0.0.5"
-SERVER_PORT = 5553
-SOCKET_TIMEOUT = 2.5
+SERVER_PORT = 553
+SOCKET_TIMEOUT = 4  # seconds
 INTER_PACKET_SLEEP = 0.1
-RECV_BUF_SIZE = 4096
 
 def resolve(filename, server_host=SERVER_HOST, server_port=SERVER_PORT):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # Read pcap file and extract DNS queries
     with open(filename, "rb") as f:
-        # Read the pcap file using dpkt
         pcap = dpkt.pcap.Reader(f)
-
         dns_packets = []
+
         for ts, buf in pcap:
             try:
-                # Parse the Ethernet frame
                 eth = dpkt.ethernet.Ethernet(buf)
-
-                # Check if it's an IP packet
                 if not isinstance(eth.data, dpkt.ip.IP):
                     continue
+
                 ip = eth.data
                 if not isinstance(ip.data, dpkt.udp.UDP):
                     continue
 
-                # Extract UDP packet
                 udp = ip.data
-
-                # Check if it's DNS (port 53) and parse
+                # Check if UDP is DNS traffic
                 if udp.sport == 53 or udp.dport == 53:
-                    dns = dpkt.dns.DNS(udp.data)
-                    if dns.qr == dpkt.dns.DNS_Q:  
-                        dns_packets.append(dns)
+                    dns_pkt = dpkt.dns.DNS(udp.data)
+                    if dns_pkt.qr == dpkt.dns.DNS_Q and dns_pkt.qd:
+                        dns_packets.append(dns_pkt)
             except Exception:
                 continue
 
-    for idx, dns in enumerate(dns_packets):
-        # Raw DNS payload
-        dns_payload = bytes(dns)
+    print(f"Found {len(dns_packets)} DNS queries in pcap")
 
-        # Custom header HHMMSS + ID
-        now = datetime.now()
-        header = f"{now.hour:02}{now.minute:02}{now.second:02}{idx:02}".encode()  # 8 bytes
+    # Send each DNS query using dnspython
+    for idx, dns_packet in enumerate(dns_packets):
+        domain_name = dns_packet.qd[0].name if dns_packet.qd else "unknown"
 
-        # Prepend custom header
-        message = header + dns_payload
-        sock.sendto(message, (server_host, server_port))
-        sleep(0.5)
+        print(f"\n[{idx+1}] Querying {domain_name} ...")
+
+        # Create dnspython DNS query
+        try:
+            outbound_query = dns.message.make_query(domain_name, dns.rdatatype.A)
+
+            # Send query via UDP
+            start_time = datetime.now()
+            response = dns.query.udp(outbound_query, server_host, port=server_port, timeout=SOCKET_TIMEOUT)
+            rtt = (datetime.now() - start_time).total_seconds()
+
+            # Log results
+            print(f"Response from {server_host}:{server_port}")
+            for ans in response.answer:
+                print(ans)
+            print(f"RTT = {rtt:.3f} s")
+
+        except Exception as e:
+            print(f"Failed to resolve {domain_name}: {e}")
+
+        sleep(INTER_PACKET_SLEEP)
 
 
 
