@@ -1,0 +1,6 @@
+{
+  "avg_lookup_latency_sec": 0.02033402681350708,
+  "avg_throughput_bytes_per_sec": 2385.1645542133047,
+  "num_successful_queries": 100,
+  "num_failed_resolutions": 0
+}
