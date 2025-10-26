@@ -147,15 +147,32 @@ def run():
     info('*** External Internet connectivity test\n')
     print( net.get('h2').cmd('ping -c4 8.8.8.8') )
 
-    # info('*** Measuring metrics Q2 ***\n\n')
-    # rs_h1 = measure_native(net,'h1','PCAP_1_H1.pcap')
-    # pprint.pprint(rs_h1)
-    # rs_h2 = measure_native(net,'h2','PCAP_2_H2.pcap')
-    # pprint.pprint(rs_h2)
-    # rs_h3 = measure_native(net,'h3','PCAP_3_H3.pcap')
-    # pprint.pprint(rs_h3)
-    # rs_h4 = measure_native(net,'h4','PCAP_4_H4.pcap')
-    # pprint.pprint(rs_h4)
+    # with open('default_measurements.txt', 'w') as f:
+    #     info('*** Measuring metrics Q2 ***\n\n')
+    #     rs_h1 = measure_native(net,'h1','PCAP_1_H1.pcap')
+    #     for key, value in rs_h1.items():
+    #         f.write(f'H1 {key}: {value}\n')
+    #     info('\n')
+    #     rs_h2 = measure_native(net,'h2','PCAP_2_H2.pcap')
+    #     for key, value in rs_h2.items():
+    #         f.write(f'H2 {key}: {value}\n')
+    #     info('\n')
+    #     rs_h3 = measure_native(net,'h3','PCAP_3_H3.pcap')
+    #     for key, value in rs_h3.items():
+    #         f.write(f'H3 {key}: {value}\n')
+    #     info('\n')
+    #     rs_h4 = measure_native(net,'h4','PCAP_4_H4.pcap')
+    #     for key, value in rs_h4.items():
+    #         f.write(f'H4 {key}: {value}\n')
+    #     info('\n')
+
+    #     pprint.pprint(rs_h1)
+    #     # rs_h2 = measure_native(net,'h2','PCAP_2_H2.pcap')
+    #     pprint.pprint(rs_h2)
+    #     # rs_h3 = measure_native(net,'h3','PCAP_3_H3.pcap')
+    #     pprint.pprint(rs_h3)
+    #     # rs_h4 = measure_native(net,'h4','PCAP_4_H4.pcap')
+    #     pprint.pprint(rs_h4)
 
     info("*** measuring metrics q4 ***\n")
     dns = net.get('dns')
