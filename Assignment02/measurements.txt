@@ -1,0 +1,73 @@
+
+--------------------- measurements by using default hosts dns server ---------------------------
+
+
+{'avg_lookup_latency_sec': 0.13912769680023193,
+ 'avg_throughput_bytes_per_sec': 1414.8319527394592,
+ 'hostname': 'h1',
+ 'num_failed_resolutions': 24,
+ 'num_successful_queries': 76}
+
+
+
+{'avg_lookup_latency_sec': 0.14773,
+ 'avg_throughput_bytes_per_sec': 1057.654188499683,
+ 'hostname': 'h2',
+ 'num_failed_resolutions': 28,
+ 'num_successful_queries': 72}
+
+
+
+
+{'avg_lookup_latency_sec': 0.19203,
+ 'avg_throughput_bytes_per_sec': 732.2054953249767,
+ 'hostname': 'h3',
+ 'num_failed_resolutions': 29,
+ 'num_successful_queries': 71}
+
+
+{'avg_lookup_latency_sec': 0.19235711402893066,
+ 'avg_throughput_bytes_per_sec': 639.344225341355,
+ 'hostname': 'h4',
+ 'num_failed_resolutions': 24,
+ 'num_successful_queries': 76}
+
+
+
+
+
+--------------------- measurements for using custom dns server ----------------------
+
+
+Client IP: 10.0.0.1
+Total Queries: 225
+Successful Queries: 195
+Failed Queries: 30
+Average Latency (ms): 1357.65
+Average Bytes: 1377.71
+Average Throughput (bytes/s): 1014.78
+----------------------------------------
+Client IP: 10.0.0.2
+Total Queries: 212
+Successful Queries: 179
+Failed Queries: 33
+Average Latency (ms): 944.35
+Average Bytes: 875.35
+Average Throughput (bytes/s): 926.93
+----------------------------------------
+Client IP: 10.0.0.3
+Total Queries: 242
+Successful Queries: 214
+Failed Queries: 28
+Average Latency (ms): 1680.68
+Average Bytes: 1110.04
+Average Throughput (bytes/s): 660.47
+----------------------------------------
+Client IP: 10.0.0.4
+Total Queries: 272
+Successful Queries: 244
+Failed Queries: 28
+Average Latency (ms): 1173.42
+Average Bytes: 1103.98
+Average Throughput (bytes/s): 940.82
+----------------------------------------

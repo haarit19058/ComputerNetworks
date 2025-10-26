@@ -49,6 +49,9 @@ def resolve(filename, server_host=SERVER_HOST, server_port=SERVER_PORT):
         try:
             outbound_query = dns.message.make_query(domain_name, dns.rdatatype.A)
 
+            # set the recursive query flag to 1
+            outbound_query.flags |= dns.flags.RD
+
             # Send query via UDP
             start_time = datetime.now()
             response = dns.query.udp(outbound_query, server_host, port=server_port, timeout=SOCKET_TIMEOUT)

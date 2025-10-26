@@ -33,8 +33,8 @@ print(f"Server running on {HOST}:{PORT}")
 
 ROOT_SERVERS = [
     "198.41.0.4",      # a.root-servers.net
-    "199.9.14.201",    # b.root-servers.net
-    "192.33.4.12",     # c.root-servers.net
+    # "199.9.14.201",    # b.root-servers.net
+    # "192.33.4.12",     # c.root-servers.net
 ]
 
 dns_cache = {}
@@ -56,7 +56,7 @@ df = pd.DataFrame(columns=[
     "Response type", "RTT(s)", "Cache Status", "Cumulative Time(ms)","Cumulative Bytes"
 ])
 
-with open('dns_logs1.csv', 'w', newline='') as f:
+with open('dns_logs.csv', 'w', newline='') as f:
     f.write("Timestamp,Client IP,Domain,Mode,Server_IP,Step,Response type,RTT(s),Cache Status,Cumulative Time(ms),Cumulative Bytes\n")
 
 def log_event(domain, mode, server_ip, step, response_type, rtt, cache_status):
@@ -64,7 +64,7 @@ def log_event(domain, mode, server_ip, step, response_type, rtt, cache_status):
     global total_time
     global total_bytes
 
-    with open('dns_logs1.csv', 'a', newline='') as f:
+    with open('dns_logs.csv', 'a', newline='') as f:
         f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{client_ip},{domain},{mode},{server_ip},{step},{response_type},{round(rtt, 4) if rtt else None},{cache_status},{round(total_time, 4)},{total_bytes}\n")
 
     # new_row = pd.DataFrame([{
@@ -294,10 +294,20 @@ while True:
         # Parse incoming DNS request using dnspython
         try:
             dns_req = dns.message.from_wire(data)
+
         except Exception as e:
             # malformed packet — ignore or optionally log
             print(f"Bad DNS packet from {client_ip}:{client_port} — {e}")
             continue
+        
+        # check if the request is for recursive resolution
+        if not (dns_req.flags & dns.flags.RD):
+            # if the request is not for recursive resolution then we skip it
+            continue
+        # otherwiser do the recursive resolution
+        
+
+
 
         # Ensure there is at least one question
         if not dns_req.question:

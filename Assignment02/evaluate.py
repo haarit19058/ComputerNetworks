@@ -1,3 +1,4 @@
+import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -36,7 +37,7 @@ for client_ip, group in grouped:
     print(f"Failed Queries: {failed_queries}")
     print(f"Average Latency (ms): {fmt(avg_latency)}")
     print(f"Average Bytes: {fmt(avg_bytes)}")
-    print(f"Average Throughput (bytes/ms): {fmt(avg_throughput)}")
+    print(f"Average Throughput (bytes/s): {fmt(avg_throughput * 1000)}")
     print("-" * 40)
 
 
@@ -45,12 +46,12 @@ print('\n\n\n\n')
 
 filtered_data = data.loc[data['Client IP'].isin(['10.0.0.1'])]
 # Group by domain
-grouped = filtered_data.groupby('Domain')
+grouped = filtered_data.groupby('Domain',sort=False)
 
 servers_used = []
 domains = []
 latencies = []
-remaining = 40
+remaining = 20
 
 for domain, group in grouped:
     if remaining == 0:
@@ -69,19 +70,26 @@ for domain, group in grouped:
 
 
 
+
+# Optional: use a beautiful Seaborn style
+sns.set(style="whitegrid", context="talk")
+
+# First line plot — number of server queries
 plt.figure(figsize=(max(6, len(domains)*0.6), 4))
-plt.bar(domains, servers_used)
+plt.plot(domains, servers_used, marker='o', linewidth=2.5, color='#1f77b4')
 plt.xticks(rotation=45, ha='right')
-plt.ylabel("Server queries made")
-plt.title(f"Top {len(domains)} domains for client(s) 10.0.0.1")
+plt.ylabel("Server Queries Made", fontsize=12)
+plt.title(f"Top {len(domains)} Domains for Client(s) 10.0.0.1", fontsize=14, weight='bold')
+plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
 
-
+# Second line plot — latency
 plt.figure(figsize=(max(6, len(domains)*0.6), 4))
-plt.bar(domains, latencies)
+plt.plot(domains, latencies, marker='o', linewidth=2.5, color='#ff7f0e')
 plt.xticks(rotation=45, ha='right')
-plt.ylabel("Latency")
-plt.title(f"Top {len(domains)} domains for client(s) 10.0.0.1")
+plt.ylabel("Latency (ms)", fontsize=12)
+plt.title(f"Latency for Top {len(domains)} Domains (Client 10.0.0.1)", fontsize=14, weight='bold')
+plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
