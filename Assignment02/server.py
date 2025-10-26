@@ -62,6 +62,7 @@ with open('dns_logs1.csv', 'w', newline='') as f:
 def log_event(domain, mode, server_ip, step, response_type, rtt, cache_status):
     global df
     global total_time
+    global total_bytes
 
     with open('dns_logs1.csv', 'a', newline='') as f:
         f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{client_ip},{domain},{mode},{server_ip},{step},{response_type},{round(rtt, 4) if rtt else None},{cache_status},{round(total_time, 4)},{total_bytes}\n")
@@ -124,7 +125,7 @@ def lookup(target_name: dns.name.Name,
             next_dot = find_name.find('.')
 
         if ip_from_cache:
-            total_bytes = 0
+            # total_bytes = 0
             # total_time = 0
             ip_ = ip_from_cache
             step_type = "Authoritative"
@@ -358,8 +359,8 @@ while True:
                 # If no answers, you may want to set NXDOMAIN instead (optional)
                 if not response_msg.answer:
                     # Log failure (same as your original)
-                    total_time = 0
-                    total_bytes = 0
+                    # total_time = 0
+                    # total_bytes = 0
                     log_event(str(target_name), "Recursive", "-", "N/A", "Failure", 0, "MISS")
                     failure += 1
                 else:
