@@ -5,7 +5,7 @@ import time
 import datetime
 import logging
 from dns.exception import DNSException, Timeout
-import pandas as pd
+# import pandas as pd
 
 ROOT_SERVERS = [
     "198.41.0.4",      # a.root-servers.net
@@ -20,35 +20,35 @@ total_time = 0
 client_ip = ""
 logs = []
 
-filename = "dns_resolution_log_v2.csv"
+# filename = "dns_resolution_log_v2.csv"
 
-df = pd.DataFrame(columns=[
-    "Timestamp", "Domain", "Mode", "Server_IP", "Step",
-    "Response type", "RTT(s)", "Cache Status", "Cumulative Time(ms)"
-])
+# df = pd.DataFrame(columns=[
+#     "Timestamp", "Domain", "Mode", "Server_IP", "Step",
+#     "Response type", "RTT(s)", "Cache Status", "Cumulative Time(ms)"
+# ])
 
-with open(filename, "w") as f:
-    f.write("Timestamp,Domain,Mode,Server_IP,Step,Response type,RTT(s),Cache Status,Cumulative Time(ms)\n")
+# with open(filename, "w") as f:
+#     f.write("Timestamp,Domain,Mode,Server_IP,Step,Response type,RTT(s),Cache Status,Cumulative Time(ms)\n")
 
 def log_event(domain, mode, server_ip, step, response_type, rtt, cache_status):
     global df
     global total_time
 
-    with open(filename, "a") as f:
-        f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{domain},{mode},{server_ip},{step},{response_type},{round(rtt, 4) if rtt else None},{cache_status},{round(total_time, 4)}\n")
+    # with open(filename, "a") as f:
+    #     f.write(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{domain},{mode},{server_ip},{step},{response_type},{round(rtt, 4) if rtt else None},{cache_status},{round(total_time, 4)}\n")
 
-    # new_row = pd.DataFrame([{
-    #     "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    #     "Client IP":client_ip,
-    #     "Domain": domain,
-    #     "Mode": mode,
-    #     "Server_IP": server_ip,
-    #     "Step": step,
-    #     "Response type": response_type,
-    #     "RTT(s)": round(rtt, 4) if rtt else None,
-    #     "Cache Status": cache_status,
-    #     "Cumulative Time(ms)": round(total_time, 4)
-    # }])
+    logs.append({
+        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Client IP":client_ip,
+        "Domain": domain,
+        "Mode": mode,
+        "Server_IP": server_ip,
+        "Step": step,
+        "Response type": response_type,
+        "RTT(s)": round(rtt, 4) if rtt else None,
+        "Cache Status": cache_status,
+        "Cumulative Time(ms)": round(total_time, 4)
+    })
     # df = pd.concat([df, new_row], ignore_index=True)
 
     # df.to_csv("dns_resolution_log.csv", index=False)
@@ -202,6 +202,7 @@ def lookup_authority(response,
     for rrset in rrsets:
         for rr_ in rrset:
             if rr_.rdtype == dns.rdatatype.NS:
+                print("Looking up NS:", str(rr_))
                 ns_ip = dns_cache.get(str(rr_))
                 if not ns_ip:
                     ns_arecords = lookup(str(rr_), dns.rdatatype.A, dns_cache)
@@ -229,7 +230,7 @@ def print_logs():
 def main():
     global total_time
     global logs
-    domain_names = ["amazon.com","google.com","google.com","wikipedia.org","nonexistentdomain.xyz"]
+    domain_names = ["i-butterfly.ru.","google.com","google.com","wikipedia.org","nonexistentdomain.xyz"]
     dns_cache = {}
     dns_cache['response_cache'] = {}
     for domain_name in domain_names:
