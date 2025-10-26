@@ -97,15 +97,8 @@ def main():
     # Get hosts
     hosts = [net.get(h) for h in ('h1','h2','h3','h4','dns')]
     print(hosts)
-    
-    req_h = hosts[0]  # Host from which to run tests
-    # Populate /etc/hosts for name resolution among hosts
-    for host in hosts:
-        req_h.cmd(f'echo "{host.IP()} {host.name}" >> /etc/hosts')
 
-    results = []
     # print("*** Measuring RTT and Bandwidth between all host pairs\n")
-
     # # Iterate over all unique host pairs to identify measured RTT and Bandwidth
     # for h1, h2 in itertools.combinations(hosts, 2):
     #     print(f"\n>>> Testing {h1.name} <-> {h2.name}")
@@ -124,6 +117,17 @@ def main():
     #     writer.writeheader()
     #     writer.writerows(results)
     # print(f"\nResults saved to {csv_filename}")
+
+    req_h = hosts[0]  # Since all hosts have same /etc/resolv.conf and /etc/hosts, changing it on one is enough
+    
+    # Populate /etc/hosts for name resolution among hosts
+    for host in hosts:
+        req_h.cmd(f'echo "{host.IP()} {host.name}" >> /etc/hosts')
+
+    # Set default nameserver as 8.8.8.8
+    req_h.cmd("echo 'nameserver 8.8.8.8' > /etc/resolv.conf")
+
+    results = []
 
     # Launch CLI
     info('*** Launching CLI (type exit to quit)\n')
