@@ -38,7 +38,7 @@ print("\n" * 4)
 filtered_data = data[(data['Response type'] == 'Failure') | (data['Response type'] == 'Response')]
 
 # coerce numeric columns so mean works
-filtered_data['Cumulative Time(ms)'] = pd.to_numeric(filtered_data['Cumulative Time(ms)'], errors='coerce')
+filtered_data['Cumulative Time (ms)'] = pd.to_numeric(filtered_data['Cumulative Time (ms)'], errors='coerce')
 filtered_data['Cumulative Bytes'] = pd.to_numeric(filtered_data['Cumulative Bytes'], errors='coerce')
 
 grouped = filtered_data.groupby('Client IP')
@@ -53,7 +53,7 @@ for client_ip, group in grouped:
     # failed_queries = int((group['Response type'] == 'Failure').sum())
     # success_queries = int((group['Response type'] == 'Response').sum())
 
-    avg_latency = group['Cumulative Time(ms)'].mean()
+    avg_latency = group['Cumulative Time (ms)'].mean()
     avg_bytes = group['Cumulative Bytes'].mean()
     
 
@@ -93,7 +93,7 @@ for domain, group in grouped:
         continue
 
     miss_count = group['Cache Status'].astype(str).isin(['MISS']).sum()
-    latency = group[group['Response type'] == 'Response']['Cumulative Time(ms)'].iloc[-1]
+    latency = group[group['Response type'] == 'Response']['Cumulative Time (ms)'].iloc[-1]
     servers_used.append(miss_count)
     domains.append(domain)
     latencies.append(latency)

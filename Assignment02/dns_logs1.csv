@@ -1,4 +1,4 @@
-Timestamp,Client IP,Domain,Mode,Server_IP,Step,Response type,RTT(s),Cache Status,Cumulative Time(ms),Cumulative Bytes
+Timestamp,Client IP,Domain,Mode,Server_IP,Step,Response type,RTT (ms),Cache Status,Cumulative Time (ms),Cumulative Bytes
 2025-10-26 14:04:32,10.0.0.1,tuhafhaberler.com.,Recursive,198.41.0.4,Root,Referral,166.6443,MISS,166.6443,530
 2025-10-26 14:04:32,10.0.0.1,tuhafhaberler.com.,Recursive,192.41.162.30,TLD,Referral,152.3237,MISS,318.968,673
 2025-10-26 14:04:32,10.0.0.1,tuhafhaberler.com.,Recursive,-,N/A,Failure,None,MISS,318.968,673
