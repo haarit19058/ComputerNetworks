@@ -4,6 +4,36 @@ import matplotlib.pyplot as plt
 
 data = pd.read_csv('dns_logs1.csv')
 
+
+
+
+# Group by client IP and compute cache hit percentages
+groups = data.groupby('Client IP')
+
+overall_hits = 0
+overall_total = 0
+
+print("\n" * 4)
+
+for client_ip, group in groups:
+    hits = len(group[group['Cache Status'] == 'HIT'])
+    total = len(group)
+    cache_percentage = (hits / total) * 100
+
+    print(f"Cache hit percentage for {client_ip:<15}: {cache_percentage:.2f}%")
+
+    overall_hits += hits
+    overall_total += total
+
+# Avoid division by zero
+overall_percentage = (overall_hits / overall_total * 100) if overall_total > 0 else 0
+
+print(f"\nOverall cache hit percentage: {overall_percentage:.2f}%")
+print("\n" * 4)
+
+
+
+
 # simple filter (elementwise OR)
 filtered_data = data[(data['Response type'] == 'Failure') | (data['Response type'] == 'Response')]
 
@@ -19,12 +49,13 @@ def fmt(x):
 print('\n\n\n\n')
 
 for client_ip, group in grouped:
-    total_queries = len(group)
-    failed_queries = int((group['Response type'] == 'Failure').sum())
-    success_queries = int((group['Response type'] == 'Response').sum())
+    # total_queries = len(group)
+    # failed_queries = int((group['Response type'] == 'Failure').sum())
+    # success_queries = int((group['Response type'] == 'Response').sum())
 
     avg_latency = group['Cumulative Time(ms)'].mean()
     avg_bytes = group['Cumulative Bytes'].mean()
+    
 
     if pd.isna(avg_latency) or avg_latency == 0 or pd.isna(avg_bytes):
         avg_throughput = float('nan')
@@ -32,9 +63,9 @@ for client_ip, group in grouped:
         avg_throughput = avg_bytes / avg_latency
 
     print(f"Client IP: {client_ip}")
-    print(f"Total Queries: {total_queries}")
-    print(f"Successful Queries: {success_queries}")
-    print(f"Failed Queries: {failed_queries}")
+    # print(f"Total Queries: {total_queries}")
+    # print(f"Successful Queries: {success_queries}")
+    # print(f"Failed Queries: {failed_queries}")
     print(f"Average Latency (ms): {fmt(avg_latency)}")
     print(f"Average Bytes: {fmt(avg_bytes)}")
     print(f"Average Throughput (bytes/s): {fmt(avg_throughput * 1000)}")
@@ -71,14 +102,14 @@ for domain, group in grouped:
 
 
 
-# Optional: use a beautiful Seaborn style
-sns.set(style="whitegrid", context="talk")
+
 
 # First line plot — number of server queries
 plt.figure(figsize=(max(6, len(domains)*0.6), 4))
 plt.plot(domains, servers_used, marker='o', linewidth=2.5, color='#1f77b4')
 plt.xticks(rotation=45, ha='right')
 plt.ylabel("Server Queries Made", fontsize=12)
+
 plt.title(f"Top {len(domains)} Domains for Client(s) 10.0.0.1", fontsize=14, weight='bold')
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()

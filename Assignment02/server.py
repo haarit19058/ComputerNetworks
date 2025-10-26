@@ -17,7 +17,7 @@ import dns.rdatatype
 import dns.flags
 import csv
 import datetime
-
+import json
 
 
 INTER_PACKET_SLEEP = 0.0
@@ -33,8 +33,8 @@ print(f"Server running on {HOST}:{PORT}")
 
 ROOT_SERVERS = [
     "198.41.0.4",      # a.root-servers.net
-    # "199.9.14.201",    # b.root-servers.net
-    # "192.33.4.12",     # c.root-servers.net
+    "199.9.14.201",    # b.root-servers.net
+    "192.33.4.12",     # c.root-servers.net
 ]
 
 dns_cache = {}
@@ -282,14 +282,19 @@ def lookup_authority(response,
         # print(" | ".join(f"{k}: {v}" for k, v in entry.items()))
 
 
-
+temp_dict = dict()
 
 while True:
     total_time = 0
     total_bytes = 0
+    with open("dc_suc_fail.json", "w") as f:
+        json.dump({str(k): v for k, v in temp_dict.items()}, f, indent=2)
     try:
         data, addr = sock.recvfrom(4096)   # bytes from client
         client_ip, client_port = addr
+
+        if client_ip not in temp_dict.keys():
+            temp_dict[client_ip] = {"success":0,"failure":0}
 
         # Parse incoming DNS request using dnspython
         try:
@@ -342,6 +347,7 @@ while True:
                     print(ans)
 
                 success += 1
+                temp_dict[client_ip]['success']+=1
 
             except Exception as e:
                 # If cached bytes corrupted, remove from cache and fall through to lookup
@@ -375,9 +381,8 @@ while True:
                     # total_bytes = 0
                     log_event(str(target_name), "Recursive", "-", "N/A", "Failure", 0, "MISS")
                     failure += 1
-                else:
-                    # Log success (you logged success after lookup in original)
-                    pass
+                    temp_dict[client_ip]['failure'] += 1
+
 
                 # Send to client
                 out = response_msg.to_wire()
@@ -389,7 +394,10 @@ while True:
                 # Print / logging
                 for ans in response_msg.answer:
                     print(ans)
-                success += 1
+
+                if response_msg.answer:
+                    success += 1
+                    temp_dict[client_ip]['success']+=1
 
             except Exception as e:
                 # If lookup crashes, reply SERVFAIL to client and log
@@ -402,6 +410,7 @@ while True:
                 except Exception:
                     pass
                 failure += 1
+                temp_dict[client_ip]['failure']+=1
 
         # optional housekeeping and pacing
         time.sleep(INTER_PACKET_SLEEP)
@@ -413,3 +422,7 @@ while True:
         # log and continue serving
         print(f"Unexpected server error: {e}")
         continue
+
+
+
+
