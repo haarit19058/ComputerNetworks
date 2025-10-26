@@ -192,6 +192,8 @@ def lookup_recurse(target_name: dns.name.Name,
         rtt = (time.monotonic() - start) * 1000.0
         count += 1
         total_time += rtt
+        # bytes received (response)
+        total_bytes += len(response.to_wire())
 
         # print(f"Query to {ip_} took {rtt} ms")
         if response.answer:
