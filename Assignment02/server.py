@@ -1,30 +1,21 @@
 import socket
 import json
-from datetime import datetime
-import dpkt
-import pandas as pd
-import dns.message
-import dns.query
-import dns.flags
-import time
 import datetime
-import logging
-from dns.exception import DNSException, Timeout
+import time
 import pandas as pd
 import dns.message
 import dns.rcode
 import dns.rdatatype
 import dns.flags
-import csv
-import datetime
-import json
+import dns.query
+from dns.exception import DNSException, Timeout
 
 
 INTER_PACKET_SLEEP = 0.0
 
 # UDP Server Setup
 HOST = '10.0.0.5'   # Localhost
-PORT = 553          # Listening port (same as client uses)
+PORT = 53          # Listening port (same as client uses)
 
 # Create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -97,6 +88,8 @@ def update_cache(response: dns.message.Message, dns_cache):
 
     arecords = []
     rrsets = response.additional
+
+    # Traverse in all resource records of A type
     for rrset in rrsets:
         for rr_ in rrset:
             if rr_.rdtype == dns.rdatatype.A:
@@ -119,29 +112,26 @@ def lookup(target_name: dns.name.Name,
         find_name = str(target_name)
         next_dot = str(target_name).find('.')
 
+        # Check cache for longest suffix match
         while not ip_from_cache and next_dot > -1:
             ip_from_cache = dns_cache.get(find_name)
             find_name = str(find_name)[next_dot+1:]
             next_dot = find_name.find('.')
 
+        # If there is a cached IP, start from there
         if ip_from_cache:
-            # total_bytes = 0
-            # total_time = 0
             ip_ = ip_from_cache
             step_type = "Authoritative"
             log_event(str(target_name), "Recursive", "-", "Cache", "Referral", 0, "HIT")
-            logging.debug(f"--------Found target {find_name} in cache--------\n")
             cache_tries += 1
             if cache_tries > 1:
                 dns_cache.pop(find_name, None)
                 ip_ = ROOT_SERVERS[i]
                 step_type = "Root"
-                # continue
 
         else:
             ip_ = ROOT_SERVERS[i]
             step_type = "Root"
-            logging.debug(f"--------Using root server {ip_}--------\n")
 
         try:
             response, resolved = lookup_recurse(target_name, qtype, ip_, resolved, dns_cache, step_type)
@@ -149,16 +139,12 @@ def lookup(target_name: dns.name.Name,
             if response.answer:
                 return response
             elif response.authority and response.authority[0].rdtype == dns.rdatatype.SOA:
-                # logging.debug("---------Got SOA authority-------")
                 break
             else:
                 i += 1
-                # print(i)
         except Timeout:
-            # logging.debug("Timeout")
             i += 1
         except DNSException:
-            # logging.debug("DNSException")
             i += 1                      
 
     return response # failure
@@ -175,11 +161,12 @@ def lookup_recurse(target_name: dns.name.Name,
     global total_time
     global count
     global total_bytes
+
+    # Make DNS query
     outbound_query = dns.message.make_query(target_name, qtype)
     total_bytes += len(outbound_query.to_wire())
 
-            # Determine response type
-
+    # Determine next step type
     next_step = "Authoritative"
 
     if step_type == "Root":
@@ -187,23 +174,24 @@ def lookup_recurse(target_name: dns.name.Name,
     
     result_type = ""
     try:
+        # Send dns query using UDP and measure RTT
         start = time.monotonic()
         response = dns.query.udp(outbound_query, ip_, 3)
         rtt = (time.monotonic() - start) * 1000.0
         count += 1
         total_time += rtt
+
         # bytes received (response)
         total_bytes += len(response.to_wire())
 
-        # print(f"Query to {ip_} took {rtt} ms")
         if response.answer:
-            # logging.debug("\n---------Got Answer-------\n")
             resolved = True             
             result_type = "Response" 
             log_event(str(target_name), "Recursive", ip_ , step_type, "Response", rtt, "MISS")
             return response, resolved
         elif response.additional:
             result_type = "Referral"
+            # Update cache with any A records in additional section
             if response.authority:
                 update_cache(response, dns_cache)
             log_event(str(target_name), "Recursive", ip_, step_type, result_type, rtt, "MISS")
@@ -218,10 +206,8 @@ def lookup_recurse(target_name: dns.name.Name,
         return response, resolved
 
     except Timeout:
-        # logging.debug("Timeout")
         return dns.message.Message(), False
     except DNSException:
-        # logging.debug("DNSException")
         return dns.message.Message(), False
     
 def lookup_additional(response,
@@ -249,7 +235,7 @@ def lookup_authority(response,
                      qtype: dns.rdata.Rdata,
                      resolved,
                      dns_cache: dict,step_type):
-    """3
+    """
     Recursively lookup authority
     """                  
     rrsets = response.authority
@@ -259,6 +245,7 @@ def lookup_authority(response,
             if rr_.rdtype == dns.rdatatype.NS:
                 ns_ip = dns_cache.get(str(rr_))
                 if not ns_ip:
+                    # Need to lookup for NS IP, since its not present in additional section
                     ns_arecords = lookup(str(rr_), dns.rdatatype.A, dns_cache)
                     if ns_arecords.answer and len(ns_arecords.answer[0]) > 0:
                         ns_ip = str(ns_arecords.answer[0][0])
@@ -307,12 +294,16 @@ while True:
         
         # check if the request is for recursive resolution
         if not (dns_req.flags & dns.flags.RD):
-            # if the request is not for recursive resolution then we skip it
+            # Build a minimal REFUSED response
+            response_msg = dns.message.Message(id=dns_req.id)
+            response_msg.flags |= dns.flags.QR        # It's a response
+            response_msg.flags &= ~dns.flags.AA       # Not authoritative
+            response_msg.flags |= dns.flags.RA        # Recursion available (but not used)
+            response_msg.set_rcode(dns.rcode.REFUSED)
+            sock.sendto(response_msg.to_wire(), addr)
+            log_event(domain_name, "Not Recursive", "-", "N/A", "Failure", 0, "MISS")
             continue
         # otherwiser do the recursive resolution
-        
-
-
 
         # Ensure there is at least one question
         if not dns_req.question:
@@ -331,10 +322,28 @@ while True:
             # Cache HIT: recreate message from bytes and patch the request ID
             try:
                 cached_msg = dns.message.from_wire(cached_wire)
+
                 # Preserve requester transaction id
                 cached_msg.id = dns_req.id
+
                 # Ensure flags show response
                 cached_msg.flags |= dns.flags.QR
+
+                # Not authoritative (resolver)
+                cached_msg.flags &= ~dns.flags.AA
+
+                # Preserve client's transaction ID
+                cached_msg.id = dns_req.id
+
+                # Copy RD from client
+                if dns_req.flags & dns.flags.RD:
+                    cached_msg.flags |= dns.flags.RD
+                else:
+                    cached_msg.flags &= ~dns.flags.RD
+
+                # Set RA = 1 (we support recursion)
+                cached_msg.flags |= dns.flags.RA
+        
                 # Send cached response bytes (use to_wire to ensure proper encoding with patched id)
                 out = cached_msg.to_wire()
                 sock.sendto(out, addr)
@@ -362,27 +371,37 @@ while True:
                 target_name = q.name
                 response_msg = lookup(target_name, qtype, dns_cache)
 
-                # If lookup returned None, create SERVFAIL
+                # If lookup failed, create a minimal SERVFAIL response
                 if response_msg is None:
-                    # construct a minimal SERVFAIL reply
                     response_msg = dns.message.Message(id=dns_req.id)
                     response_msg.set_rcode(dns.rcode.SERVFAIL)
-                    response_msg.flags |= dns.flags.QR
 
-                # Ensure response contains the original transaction id
-                response_msg.id = dns_req.id
-                # Ensure it is marked as a response
+                # --- Standard response header setup ---
+
+                # Ensure it's a response
                 response_msg.flags |= dns.flags.QR
 
-                # If no answers, you may want to set NXDOMAIN instead (optional)
+                # Not authoritative (since this is a resolver, not an authoritative server)
+                response_msg.flags &= ~dns.flags.AA
+
+                # Preserve RD (Recursion Desired) from client query
+                if dns_req.flags & dns.flags.RD:
+                    response_msg.flags |= dns.flags.RD
+                else:
+                    response_msg.flags &= ~dns.flags.RD
+
+                # Indicate recursion is available (RA = 1)
+                response_msg.flags |= dns.flags.RA
+
+                # Preserve transaction ID (in case lookup returns a new message object)
+                response_msg.id = dns_req.id
+
+                # If no answers, set NXDOMAIN
                 if not response_msg.answer:
-                    # Log failure (same as your original)
-                    # total_time = 0
-                    # total_bytes = 0
+                    response_msg.set_rcode(dns.rcode.NXDOMAIN)
                     log_event(str(target_name), "Recursive", "-", "N/A", "Failure", 0, "MISS")
                     failure += 1
                     temp_dict[client_ip]['failure'] += 1
-
 
                 # Send to client
                 out = response_msg.to_wire()
@@ -422,7 +441,3 @@ while True:
         # log and continue serving
         print(f"Unexpected server error: {e}")
         continue
-
-
-
-

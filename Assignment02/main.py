@@ -138,8 +138,8 @@ def run():
 
     info('*** Setting nameserver\n')
     for h in hosts:
-        h.cmd("echo 'nameserver 8.8.8.8' > /etc/resolv.conf")
-        # h.cmd("echo 'nameserver 10.0.0.5' > /etc/resolv.conf")
+        # h.cmd("echo 'nameserver 8.8.8.8' > /etc/resolv.conf")
+        h.cmd("echo 'nameserver 10.0.0.5' > /etc/resolv.conf")
 
     info('*** Internal connectivity test\n')
     net.pingAll()
@@ -147,7 +147,7 @@ def run():
     info('*** External Internet connectivity test\n')
     print( net.get('h2').cmd('ping -c4 8.8.8.8') )
 
-    # info('*** Measuring metrics Q2 ***\n\n')
+    # info('*** Measuring metrics Part B***\n\n')
     # with open('default_measurements_1.txt', 'w') as f:
 
     #     rs_h1 = measure_native(net,'h1','PCAP_1_H1.pcap')
@@ -177,7 +177,7 @@ def run():
     #         f.write(f'H4 {key}: {value}\n')
     #     info('\n')
 
-    info("*** measuring metrics q4 ***\n")
+    info("*** measuring metrics Part D ***\n")
     dns = net.get('dns')
     dns.cmd('python3 server.py &')
 
@@ -188,7 +188,6 @@ def run():
         num = h.name[1]
         h.cmd(f'sudo python3 client.py --pcap PCAP_{num}_H{num}.pcap --hostname H{num}')
         time.sleep(10)
-
 
     CLI(net)
     net.stop()

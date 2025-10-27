@@ -98,25 +98,26 @@ def main():
     hosts = [net.get(h) for h in ('h1','h2','h3','h4','dns')]
     print(hosts)
 
-    # print("*** Measuring RTT and Bandwidth between all host pairs\n")
-    # # Iterate over all unique host pairs to identify measured RTT and Bandwidth
-    # for h1, h2 in itertools.combinations(hosts, 2):
-    #     print(f"\n>>> Testing {h1.name} <-> {h2.name}")
-    #     avg_rtt, bw_mbps = measure_pair(h1, h2)
-    #     results.append({
-    #         'Host_Pair': f'{h1.name}-{h2.name}',
-    #         'Avg_RTT_ms': round(avg_rtt, 3) if avg_rtt else None,
-    #         'Bandwidth_Mbps': round(bw_mbps, 3) if bw_mbps else None
-    #     })
-    #     print(f"RTT = {avg_rtt:.2f} ms, Bandwidth = {bw_mbps:.2f} Mbps")
+    results = []
+    print("*** Measuring RTT and Bandwidth between all host pairs\n")
+    # Iterate over all unique host pairs to identify measured RTT and Bandwidth
+    for h1, h2 in itertools.combinations(hosts, 2):
+        print(f"\n>>> Testing {h1.name} <-> {h2.name}")
+        avg_rtt, bw_mbps = measure_pair(h1, h2)
+        results.append({
+            'Host_Pair': f'{h1.name}-{h2.name}',
+            'Avg_RTT_ms': round(avg_rtt, 3) if avg_rtt else None,
+            'Bandwidth_Mbps': round(bw_mbps, 3) if bw_mbps else None
+        })
+        print(f"RTT = {avg_rtt:.2f} ms, Bandwidth = {bw_mbps:.2f} Mbps")
 
-    # # Write to CSV
-    # csv_filename = 'network_metrics.csv'
-    # with open(csv_filename, 'w', newline='') as f:
-    #     writer = csv.DictWriter(f, fieldnames=['Host_Pair', 'Avg_RTT_ms', 'Bandwidth_Mbps'])
-    #     writer.writeheader()
-    #     writer.writerows(results)
-    # print(f"\nResults saved to {csv_filename}")
+    # Write to CSV
+    csv_filename = 'network_metrics.csv'
+    with open(csv_filename, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['Host_Pair', 'Avg_RTT_ms', 'Bandwidth_Mbps'])
+        writer.writeheader()
+        writer.writerows(results)
+    print(f"\nResults saved to {csv_filename}")
 
     req_h = hosts[0]  # Since all hosts have same /etc/resolv.conf and /etc/hosts, changing it on one is enough
     
@@ -126,8 +127,6 @@ def main():
 
     # Set default nameserver as 8.8.8.8
     req_h.cmd("echo 'nameserver 8.8.8.8' > /etc/resolv.conf")
-
-    results = []
 
     # Launch CLI
     info('*** Launching CLI (type exit to quit)\n')
